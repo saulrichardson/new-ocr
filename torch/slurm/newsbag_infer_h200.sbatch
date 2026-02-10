@@ -18,10 +18,13 @@
 
 set -euo pipefail
 
-PROJECT_ROOT="${PROJECT_ROOT:-/scratch/$USER/paddleocr_vl15/new-ocr}"
-VENV_DIR="${VENV_DIR:-/scratch/$USER/paddleocr_vl15/envs/newsbag}"
+BASE="${BASE:-/scratch/$USER/paddleocr_vl15}"
+PROJECT_ROOT="${PROJECT_ROOT:-$BASE/new-ocr}"
+VENV_DIR="${VENV_DIR:-$BASE/envs/newsbag}"
 CONFIG_JSON="${CONFIG_JSON:-$PROJECT_ROOT/configs/pipeline.torch.json}"
-STAGES="${STAGES:-paddle_layout,paddle_vl15,dell,mineru}"
+# IMPORTANT: Paddle (layout_detection + VL1.5 doc_parser) does not currently run reliably on Torch H200
+# due to CUDA kernel image mismatch errors. Keep this job H200-safe by defaulting to Dell+MinerU only.
+STAGES="${STAGES:-dell,mineru}"
 RUN_DIR="${RUN_DIR:-}"
 NEWSBAG_PY="${NEWSBAG_PY:-}"
 
@@ -45,5 +48,11 @@ echo "[newsbag] host=$(hostname) date=$(date)"
 echo "[newsbag] run_dir=$RUN_DIR"
 echo "[newsbag] stages=$STAGES"
 nvidia-smi
+
+if echo ",$STAGES," | grep -qE ",paddle_layout,|,paddle_vl15,"; then
+  echo "[newsbag] ERROR: Paddle stages requested on H200 ($STAGES). Paddle must run on l40s_public." >&2
+  echo "[newsbag] Hint: run split GPU: L40S for paddle_layout,paddle_vl15 and H200 for dell,mineru." >&2
+  exit 3
+fi
 
 "$NEWSBAG_PY" -m newsbag run --config "$CONFIG_JSON" --run-dir "$RUN_DIR" --stages "$STAGES"

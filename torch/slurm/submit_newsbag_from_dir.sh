@@ -13,9 +13,10 @@
 # Flags:
 #   --input-dir <dir>   Required. Directory containing PNG/JPG/TIFF/etc.
 #   --recursive         Optional. Recurse subdirectories.
-#   --gpu l40s|h200     Optional. Default: l40s.
+#   --gpu l40s|h200|split  Optional. Default: l40s.
 #   --max-pages N       Optional. Limit the manifest to N images (for smoke tests).
 #   --run-dir <dir>     Optional. Explicit run dir (default: /scratch/.../runs/layout_bagging_<ts>)
+#   --stages <csv>      Optional. Override stages for the single GPU job mode (l40s/h200).
 #
 # Optional env:
 #   BASE, PROJECT_ROOT, TEMPLATE_CONFIG_JSON
@@ -27,6 +28,7 @@ RECURSIVE=0
 GPU_KIND="l40s"
 RUN_DIR=""
 MAX_PAGES=0
+STAGES=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -40,6 +42,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --gpu)
       GPU_KIND="${2:-l40s}"
+      shift 2
+      ;;
+    --stages)
+      STAGES="${2:-}"
       shift 2
       ;;
     --max-pages)
@@ -67,7 +73,13 @@ if [[ -z "$INPUT_DIR" ]]; then
 fi
 
 BASE="${BASE:-/scratch/$USER/paddleocr_vl15}"
-PROJECT_ROOT="${PROJECT_ROOT:-$BASE/new-ocr}"
+if [ -z "${PROJECT_ROOT:-}" ]; then
+  if [ -d "$BASE/newspaper-parsing" ]; then
+    PROJECT_ROOT="$BASE/newspaper-parsing"
+  else
+    PROJECT_ROOT="$BASE/new-ocr"
+  fi
+fi
 TEMPLATE_CONFIG_JSON="${TEMPLATE_CONFIG_JSON:-$PROJECT_ROOT/configs/pipeline.torch.json}"
 
 STAMP="$(date +%Y%m%d_%H%M%S)"
@@ -85,6 +97,9 @@ echo "[submit] recursive=$RECURSIVE"
 echo "[submit] gpu_kind=$GPU_KIND"
 echo "[submit] max_pages=$MAX_PAGES"
 echo "[submit] run_dir=$RUN_DIR"
+if [[ -n "$STAGES" ]]; then
+  echo "[submit] stages=$STAGES"
+fi
 
 MAKE_MANIFEST_ARGS=(--input "$INPUT_DIR" --output "$MANIFEST")
 if [[ "$RECURSIVE" -eq 1 ]]; then
@@ -124,6 +139,8 @@ PY
 GPU_SCRIPT="$PROJECT_ROOT/torch/slurm/newsbag_infer_l40s.sbatch"
 if [[ "$GPU_KIND" == "h200" ]]; then
   GPU_SCRIPT="$PROJECT_ROOT/torch/slurm/newsbag_infer_h200.sbatch"
+elif [[ "$GPU_KIND" == "split" ]]; then
+  GPU_SCRIPT=""
 fi
 
 export RUN_DIR
@@ -131,5 +148,28 @@ export CONFIG_JSON="$OUT_CONFIG"
 export GPU_SCRIPT
 
 cd "$PROJECT_ROOT"
-bash torch/slurm/submit_newsbag_full.sh
 
+if [[ "$GPU_KIND" == "split" ]]; then
+  # Split-GPU submission: Paddle on L40S, Dell+MinerU on H200, then CPU fuse/review.
+  bash torch/slurm/submit_newsbag_split_gpu.sh
+  exit 0
+fi
+
+if [[ -z "$STAGES" ]]; then
+  if [[ "$GPU_KIND" == "h200" ]]; then
+    STAGES="dell,mineru"
+  else
+    STAGES="paddle_layout,paddle_vl15,dell,mineru"
+  fi
+fi
+
+if [[ "$GPU_KIND" == "h200" ]]; then
+  if echo ",$STAGES," | grep -qE ",paddle_layout,|,paddle_vl15,"; then
+    echo "[submit] ERROR: Paddle stages requested with --gpu h200 ($STAGES)." >&2
+    echo "[submit] Use --gpu split (recommended) or --gpu l40s." >&2
+    exit 3
+  fi
+fi
+
+export STAGES
+bash torch/slurm/submit_newsbag_full.sh

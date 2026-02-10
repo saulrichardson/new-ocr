@@ -18,8 +18,9 @@
 
 set -euo pipefail
 
-PROJECT_ROOT="${PROJECT_ROOT:-/scratch/$USER/paddleocr_vl15/new-ocr}"
-VENV_DIR="${VENV_DIR:-/scratch/$USER/paddleocr_vl15/envs/newsbag}"
+BASE="${BASE:-/scratch/$USER/paddleocr_vl15}"
+PROJECT_ROOT="${PROJECT_ROOT:-$BASE/new-ocr}"
+VENV_DIR="${VENV_DIR:-$BASE/envs/newsbag}"
 CONFIG_JSON="${CONFIG_JSON:-$PROJECT_ROOT/configs/pipeline.torch.json}"
 STAGES="${STAGES:-paddle_layout,paddle_vl15,dell,mineru}"
 RUN_DIR="${RUN_DIR:-}"

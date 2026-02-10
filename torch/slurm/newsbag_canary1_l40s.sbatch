@@ -12,7 +12,11 @@
 set -euo pipefail
 
 BASE="/scratch/$USER/paddleocr_vl15"
-REPO="$BASE/new-ocr"
+if [ -d "$BASE/newspaper-parsing" ]; then
+  REPO="$BASE/newspaper-parsing"
+else
+  REPO="$BASE/new-ocr"
+fi
 RUN_DIR="$BASE/runs/canary1_$(date +%Y%m%d_%H%M%S)"
 
 # Use the portable conda python directly (not a venv tied to /usr/bin/python3).

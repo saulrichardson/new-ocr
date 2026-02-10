@@ -70,6 +70,9 @@ Submit:
 # Recommended: submit a directory of scans end-to-end (manifest + config + GPU infer + CPU fuse/review)
 bash torch/slurm/submit_newsbag_from_dir.sh --input-dir /scratch/$USER/paddleocr_vl15/input/ad_hoc_newspapers_20260205_190618 --recursive --gpu l40s
 
+# Recommended for heavy runs: split GPU execution (Paddle on L40S, Dell+MinerU on H200), then CPU fuse/review.
+bash torch/slurm/submit_newsbag_from_dir.sh --input-dir /scratch/$USER/paddleocr_vl15/input/stress_iter10_pages --recursive --gpu split
+
 # Alternative: two-job chain only (assumes configs/pipeline.torch.json already points at your manifest)
 bash torch/slurm/submit_newsbag_full.sh
 
@@ -85,6 +88,14 @@ Monitor:
 ```bash
 bash scripts/monitor_torch_jobs.sh
 ```
+
+### Torch note: H200 vs Paddle
+As of February 2026, Paddle stages (`layout_detection`, `doc_parser --pipeline_version v1.5`) may fail on Torch `h200_public`
+with CUDA kernel image mismatch errors. This repo treats that as an operational constraint:
+
+- Use `l40s_public` for Paddle stages.
+- Use `h200_public` for Dell + MinerU (fast, stable).
+- Use `--gpu split` to run them concurrently and keep throughput high.
 
 ## Outputs
 Each run writes a timestamped run directory with:

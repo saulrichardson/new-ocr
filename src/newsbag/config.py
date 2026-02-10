@@ -95,13 +95,31 @@ def _resolve_optional_path(raw: str, base_dir: Path) -> str:
     expanded = Path(os.path.expandvars(raw)).expanduser()
     if expanded.is_absolute():
         return str(expanded)
+
+    # Many Torch flows generate a run-scoped config under a run directory (e.g. RUN_DIR/manifests).
+    # In those cases, paths like "src/newsbag/..." should resolve relative to the repo checkout,
+    # not relative to the run directory. We therefore also consider CWD as a likely repo root.
+    cwd = Path.cwd().resolve()
+    c0 = (cwd / expanded).resolve()
     c1 = (base_dir / expanded).resolve()
     c2 = (base_dir.parent / expanded).resolve()
     path_txt = str(expanded).replace("\\", "/")
     prefer_repo_root = path_txt.startswith(("src/", "scripts/", "torch/", "docs/", "configs/"))
     if prefer_repo_root:
-        return str(c2 if (c2.exists() or not c1.exists()) else c1)
-    return str(c1 if (c1.exists() or not c2.exists()) else c2)
+        # Prefer repo-root-ish resolution: CWD first (common in sbatch scripts that `cd` into repo),
+        # then base_dir.parent (when config lives in configs/), then base_dir.
+        for cand in (c0, c2, c1):
+            if cand.exists():
+                return str(cand)
+
+        # Don't fabricate a non-existent absolute path (this can later break subprocess calls).
+        return str(expanded)
+
+    # For non-repo-root paths, prefer base_dir, then base_dir.parent, then CWD.
+    for cand in (c1, c2, c0):
+        if cand.exists():
+            return str(cand)
+    return str(expanded)
 
 
 def load_config(path: Path) -> PipelineConfig:

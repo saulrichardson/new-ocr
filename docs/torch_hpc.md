@@ -34,10 +34,11 @@ does not need the heavy model deps because the pipeline calls model runners via 
 
 ```bash
 BASE=/scratch/$USER/paddleocr_vl15
+PROJECT_ROOT="$BASE/newspaper-parsing"  # or "$BASE/new-ocr" if you cloned into that folder
 python3 -m venv $BASE/envs/newsbag
 source $BASE/envs/newsbag/bin/activate
 python -m pip install --upgrade pip
-python -m pip install -e $BASE/new-ocr
+python -m pip install -e "$PROJECT_ROOT"
 ```
 
 ### Optional fallback: avoid venv Python mismatch
@@ -47,8 +48,9 @@ you can run the orchestration with a portable Conda env python instead:
 
 ```bash
 BASE=/scratch/$USER/paddleocr_vl15
+PROJECT_ROOT="$BASE/newspaper-parsing"  # or "$BASE/new-ocr" if you cloned into that folder
 export NEWSBAG_PY="$BASE/envs/mineru25_py310/bin/python"
-$NEWSBAG_PY -m pip install -e $BASE/new-ocr
+$NEWSBAG_PY -m pip install -e "$PROJECT_ROOT"
 ```
 
 Model envs are referenced by path in `configs/pipeline.torch.json`. Verify they exist:
@@ -84,21 +86,39 @@ Recommended (two-job chain):
 1. GPU inference-only job: `paddle_layout,paddle_vl15,dell,mineru`
 2. CPU post-processing job: `fusion,review`
 
+### Split GPU Mode (Recommended When Using H200)
+As of February 2026, Paddle stages can fail on Torch `h200_public` with CUDA kernel image mismatch errors.
+To keep throughput high while still using H200, run a split GPU flow:
+
+1. L40S GPU job: `paddle_layout,paddle_vl15`
+2. H200 GPU job: `dell,mineru`
+3. CPU job: `fusion,review` (afterok on both GPU jobs)
+
 One-command helper (run on Torch login, from inside the repo):
 
 ```bash
-cd /scratch/$USER/paddleocr_vl15/new-ocr
+cd /scratch/$USER/paddleocr_vl15/newspaper-parsing
 bash torch/slurm/submit_newsbag_full.sh
 ```
 
 End-to-end helper when you have a directory of scans:
 
 ```bash
-cd /scratch/$USER/paddleocr_vl15/new-ocr
+cd /scratch/$USER/paddleocr_vl15/newspaper-parsing
 bash torch/slurm/submit_newsbag_from_dir.sh \
   --input-dir /scratch/$USER/paddleocr_vl15/input/ad_hoc_newspapers_20260205_190618 \
   --recursive \
   --gpu l40s
+```
+
+Split GPU helper:
+
+```bash
+cd /scratch/$USER/paddleocr_vl15/newspaper-parsing
+bash torch/slurm/submit_newsbag_from_dir.sh \
+  --input-dir /scratch/$USER/paddleocr_vl15/input/stress_iter10_pages \
+  --recursive \
+  --gpu split
 ```
 
 Manual submission (explicit run dir + dependency):

@@ -18,13 +18,21 @@ NEWSBAG_PY="${NEWSBAG_PY:-}"
 CONFIG_JSON="${CONFIG_JSON:-$PROJECT_ROOT/configs/pipeline.torch.json}"
 
 # Default GPU job stages: sources only. (Fusion/review are CPU-heavy.)
-STAGES="${STAGES:-paddle_layout,paddle_vl15,dell,mineru}"
+# IMPORTANT: Paddle stages do not currently run reliably on Torch H200 (CUDA kernel image mismatch).
+# Keep H200 jobs H200-safe by defaulting to Dell+MinerU only.
+STAGES="${STAGES:-dell,mineru}"
 RUN_DIR="${RUN_DIR:-}"
 
 cd "$PROJECT_ROOT"
 
 echo "[newsbag] host=$(hostname) date=$(date)"
 nvidia-smi
+
+if echo ",$STAGES," | grep -qE ",paddle_layout,|,paddle_vl15,"; then
+  echo "[newsbag] ERROR: Paddle stages requested on H200 ($STAGES). Paddle must run on l40s_public." >&2
+  echo "[newsbag] Hint: run split GPU: L40S for paddle_layout,paddle_vl15 and H200 for dell,mineru." >&2
+  exit 3
+fi
 
 if [ -z "$NEWSBAG_PY" ]; then
   source "$VENV_DIR/bin/activate"
