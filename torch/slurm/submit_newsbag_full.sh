@@ -48,7 +48,9 @@ JID_FUSE="$(
 )"
 echo "[submit] fuse/review job: $JID_FUSE (afterok:$JID_INFER)"
 
+INFER_JOB_NAME="$(basename "$GPU_SCRIPT" .sbatch)"
+
 echo "[submit] Monitor:"
 echo "  squeue -u $USER"
-echo "  tail -f /scratch/$USER/paddleocr_vl15/logs/newsbag_infer_l40s-$JID_INFER.out"
+echo "  tail -f /scratch/$USER/paddleocr_vl15/logs/$INFER_JOB_NAME-$JID_INFER.out"
 echo "  tail -f /scratch/$USER/paddleocr_vl15/logs/newsbag_fuse_review-$JID_FUSE.out"

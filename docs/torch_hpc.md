@@ -55,7 +55,7 @@ Model envs are referenced by path in `configs/pipeline.torch.json`. Verify they 
 
 ```bash
 BASE=/scratch/$USER/paddleocr_vl15
-$BASE/envs/paddleocr_compute_node/bin/paddleocr --help
+$BASE/envs/paddleocr_gpu_py312/bin/paddleocr --help
 $BASE/envs/mineru25_py310/bin/python -c 'import onnxruntime as ort; print(ort.get_available_providers())'
 $BASE/envs/mineru25_py310/bin/python -c 'import mineru_vl_utils; print(mineru_vl_utils.__version__)'
 ```

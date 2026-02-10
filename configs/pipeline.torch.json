@@ -2,7 +2,7 @@
   "manifest_path": "/scratch/$USER/paddleocr_vl15/input/news_manifest.txt",
   "run_root": "/scratch/$USER/paddleocr_vl15/runs",
   "run_name": "layout_bagging_torch",
-  "paddleocr_bin": "/scratch/$USER/paddleocr_vl15/envs/paddleocr_compute_node/bin/paddleocr",
+  "paddleocr_bin": "/scratch/$USER/paddleocr_vl15/envs/paddleocr_gpu_py312/bin/paddleocr",
   "device_order": [
     "gpu:0"
   ],
