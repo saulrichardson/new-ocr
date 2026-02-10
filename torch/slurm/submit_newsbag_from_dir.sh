@@ -8,13 +8,14 @@
 # 4) Submits GPU inference + CPU fusion/review (afterok)
 #
 # Usage (on Torch login):
-#   bash torch/slurm/submit_newsbag_from_dir.sh --input-dir /path/to/pngs --recursive --gpu l40s
+#   bash torch/slurm/submit_newsbag_from_dir.sh --input-dir /path/to/scans --recursive --gpu l40s
 #
 # Flags:
 #   --input-dir <dir>   Required. Directory containing PNG/JPG/TIFF/etc.
 #   --recursive         Optional. Recurse subdirectories.
 #   --gpu l40s|h200     Optional. Default: l40s.
-#   --run-dir <dir>     Optional. Explicit run dir (must be under /scratch).
+#   --max-pages N       Optional. Limit the manifest to N images (for smoke tests).
+#   --run-dir <dir>     Optional. Explicit run dir (default: /scratch/.../runs/layout_bagging_<ts>)
 #
 # Optional env:
 #   BASE, PROJECT_ROOT, TEMPLATE_CONFIG_JSON
@@ -25,6 +26,7 @@ INPUT_DIR=""
 RECURSIVE=0
 GPU_KIND="l40s"
 RUN_DIR=""
+MAX_PAGES=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -40,12 +42,16 @@ while [[ $# -gt 0 ]]; do
       GPU_KIND="${2:-l40s}"
       shift 2
       ;;
+    --max-pages)
+      MAX_PAGES="${2:-0}"
+      shift 2
+      ;;
     --run-dir)
       RUN_DIR="${2:-}"
       shift 2
       ;;
     -h|--help)
-      sed -n '1,120p' "$0"
+      sed -n '1,180p' "$0"
       exit 0
       ;;
     *)
@@ -69,14 +75,15 @@ if [[ -z "$RUN_DIR" ]]; then
   RUN_DIR="$BASE/runs/layout_bagging_$STAMP"
 fi
 
-mkdir -p "$RUN_DIR"
+mkdir -p "$RUN_DIR/manifests"
 
-MANIFEST="$RUN_DIR/input_manifest.txt"
-OUT_CONFIG="$RUN_DIR/config.json"
+MANIFEST="$RUN_DIR/manifests/images.input.txt"
+OUT_CONFIG="$RUN_DIR/manifests/config.input.json"
 
 echo "[submit] input_dir=$INPUT_DIR"
 echo "[submit] recursive=$RECURSIVE"
 echo "[submit] gpu_kind=$GPU_KIND"
+echo "[submit] max_pages=$MAX_PAGES"
 echo "[submit] run_dir=$RUN_DIR"
 
 MAKE_MANIFEST_ARGS=(--input "$INPUT_DIR" --output "$MANIFEST")
@@ -86,6 +93,19 @@ fi
 
 # scripts/make_manifest.py is stdlib-only; use python3 from login node.
 python3 "$PROJECT_ROOT/scripts/make_manifest.py" "${MAKE_MANIFEST_ARGS[@]}"
+
+if [[ "$MAX_PAGES" -gt 0 ]]; then
+  tmp="$MANIFEST.tmp"
+  head -n "$MAX_PAGES" "$MANIFEST" > "$tmp"
+  mv "$tmp" "$MANIFEST"
+fi
+
+COUNT="$(wc -l < "$MANIFEST" | tr -d ' ')"
+echo "[submit] manifest_count=$COUNT"
+if [[ "$COUNT" -eq 0 ]]; then
+  echo "ERROR: manifest is empty (no images found)" >&2
+  exit 2
+fi
 
 # Create run-scoped config so this run is self-contained and reproducible.
 python3 - <<PY
@@ -97,7 +117,7 @@ payload=json.loads(tmpl.read_text(encoding="utf-8"))
 payload["manifest_path"]=str(Path("$MANIFEST"))
 payload["run_root"]=str(Path("$BASE")/"runs")
 payload["run_name"]="layout_bagging"
-Path("$OUT_CONFIG").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+Path("$OUT_CONFIG").write_text(json.dumps(payload, indent=2) + "\\n", encoding="utf-8")
 print("[submit] wrote config:", "$OUT_CONFIG")
 PY
 

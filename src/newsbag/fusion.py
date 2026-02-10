@@ -249,18 +249,22 @@ def dedupe_boxes(
         if is_textlike and is_large:
             support = cross_source_support_count(c, cands)
 
+        # For very large text-like regions, we never want to keep the raw giant block if it's
+        # weakly supported; we prefer synthetic recovery boxes (around uncovered pseudo-lines).
+        force_synthetic_only = False
+
         if is_textlike and is_wide_strip and support < 2:
             continue
         if is_textlike and is_tall_strip and support < 2:
             continue
         if is_textlike and area_ratio >= 0.22 and support < 2 and score < 0.75:
-            continue
+            force_synthetic_only = True
         if is_textlike and area_ratio >= 0.30 and support < 3:
-            continue
+            force_synthetic_only = True
 
         same = [s for s in selected if s["norm_label"] == c["norm_label"] and iou(s["bbox_xyxy"], bb) >= 0.85]
         if not same:
-            if is_textlike and is_large and support < 2:
+            if is_textlike and is_large and (support < 2 or force_synthetic_only):
                 total_hits = 0
                 new_hits = 0
                 for ln in pseudo_lines:
@@ -281,6 +285,8 @@ def dedupe_boxes(
                     if synth:
                         selected.extend(synth)
                         continue
+                if force_synthetic_only:
+                    continue
             selected.append(c)
             continue
 
@@ -306,6 +312,68 @@ def dedupe_boxes(
     for i, b in enumerate(selected, 1):
         b["reading_order"] = i
     return selected
+
+
+def base_mask_candidates(
+    candidates: List[Dict[str, Any]],
+    pseudo_lines: List[Dict[str, Any]],
+    page_area: float,
+    page_w: int,
+    page_h: int,
+    line_cover_threshold: float,
+) -> List[Dict[str, Any]]:
+    """Select candidates used to build base_mask for base_recall_ratio.
+
+    base_recall_ratio is meant to approximate "recall" against *plausible* text regions,
+    not against raw noisy boxes (e.g. huge low-confidence strips). We therefore drop
+    candidates that look like obvious noise and/or don't cover any pseudo-lines.
+    """
+
+    out: List[Dict[str, Any]] = []
+    for c in candidates:
+        bb = c.get("bbox_xyxy") or []
+        if not bb or len(bb) != 4:
+            continue
+        bw = float(bb[2] - bb[0])
+        bh = float(bb[3] - bb[1])
+        if bw <= 1 or bh <= 1:
+            continue
+
+        nl = str(c.get("norm_label") or "other")
+        if nl not in ("text", "title"):
+            # Keep non-text regions (tables/images) in the base, they are usually meaningful.
+            out.append(c)
+            continue
+
+        area_ratio = area(bb) / max(1.0, page_area)
+        is_wide_strip = bw >= 0.65 * page_w and bh <= 0.06 * page_h
+        is_tall_strip = bh >= 0.65 * page_h and bw <= 0.06 * page_w
+        is_large = area_ratio >= 0.08 or is_wide_strip or is_tall_strip
+        support = cross_source_support_count(c, candidates) if is_large else 1
+        score = float(c.get("score") or 0.0)
+
+        # Drop extreme strip noise unless corroborated.
+        if (is_wide_strip or is_tall_strip) and support < 2:
+            continue
+        # Drop very large, weakly-supported text blocks (classic "one giant box" failure).
+        if area_ratio >= 0.22 and support < 2 and score < 0.75:
+            continue
+        if area_ratio >= 0.30 and support < 3:
+            continue
+
+        # Require that the region actually covers some pseudo-lines to be considered "in base".
+        hits = 0
+        for ln in pseudo_lines:
+            if coverage(ln["bbox_xyxy"], bb) >= line_cover_threshold:
+                hits += 1
+                if hits >= 2:
+                    break
+        if hits < 2:
+            continue
+
+        out.append(c)
+
+    return out
 
 
 def variant_metrics(
@@ -446,7 +514,15 @@ def run_fusion(
         )
 
         consensus_lines = dedupe_line_boxes(paddle_union4 + dell_boxes + mineru_boxes, w, h)
-        base_mask = raster_mask(paddle_union4 + dell_boxes + mineru_boxes, w, h)
+        mask_cands = base_mask_candidates(
+            paddle_union4 + dell_boxes + mineru_boxes,
+            consensus_lines,
+            page_area=page_area,
+            page_w=w,
+            page_h=h,
+            line_cover_threshold=line_cover_threshold,
+        )
+        base_mask = raster_mask(mask_cands, w, h)
 
         variants = {
             "S1_paddle_best_single": best_paddle_boxes,

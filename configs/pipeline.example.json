@@ -1,8 +1,8 @@
 {
-  "manifest_path": "/scratch/$USER/paddleocr_vl15/input/news_manifest.txt",
-  "run_root": "/scratch/$USER/paddleocr_vl15/runs",
+  "manifest_path": "/ABS/PATH/TO/images_manifest.txt",
+  "run_root": "/ABS/PATH/TO/newsbag_runs",
   "run_name": "layout_bagging",
-  "paddleocr_bin": "/scratch/$USER/paddleocr_vl15/envs/paddleocr_gpu_py312/bin/paddleocr",
+  "paddleocr_bin": "paddleocr",
   "device_order": [
     "gpu:0",
     "cpu"
@@ -40,11 +40,11 @@
   "dell": {
     "enabled": true,
     "variant_id": "dell_c0005_i010",
-    "python_bin": "/scratch/$USER/paddleocr_vl15/envs/doclayout_l40s/bin/python",
+    "python_bin": "python3",
     "script_path": "src/newsbag/runners/run_dell_layout_only.py",
-    "model_path": "/scratch/$USER/paddleocr_vl15/tuning/iter8_dell_investigate_20260207_152759/models_try/american_stories_models/layout_model_new.onnx",
-    "label_map_path": "/scratch/$USER/paddleocr_vl15/tuning/iter8_dell_investigate_20260207_152759/repo/src/label_maps/label_map_layout.json",
-    "repo_src": "/scratch/$USER/paddleocr_vl15/tuning/iter8_dell_investigate_20260207_152759/repo/src",
+    "model_path": "/ABS/PATH/TO/layout_model_new.onnx",
+    "label_map_path": "/ABS/PATH/TO/label_map_layout.json",
+    "repo_src": "",
     "provider": "auto",
     "conf": 0.005,
     "iou": 0.1,
@@ -54,7 +54,7 @@
   "mineru": {
     "enabled": true,
     "variant_id": "mineru25",
-    "python_bin": "/scratch/$USER/paddleocr_vl15/envs/mineru25_py310/bin/python",
+    "python_bin": "python3",
     "script_path": "src/newsbag/runners/run_mineru25_layout.py",
     "model_id": "opendatalab/MinerU2.5-2509-1.2B",
     "max_pages": 0,

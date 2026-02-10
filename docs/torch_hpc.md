@@ -20,14 +20,17 @@ sbatch --test-only -A torch_pr_609_general -p l40s_public \
 
 ## Environment Management
 
-This repo intentionally separates environments:
+This repo intentionally separates environments (and keeps them decoupled):
 
 - `newsbag` orchestration env (lightweight: `numpy`, `Pillow`)
 - PaddleOCR CLI env (Paddle layout + VL1.5 doc_parser)
 - Dell env (ONNXRuntime CUDA)
 - MinerU env (Transformers + `mineru_vl_utils`)
 
-Recommended (scratch-backed venv for orchestration):
+### Recommended orchestration env
+
+Use a scratch-backed venv for the orchestration layer (this repo). It stays lightweight and
+does not need the heavy model deps because the pipeline calls model runners via subprocess.
 
 ```bash
 BASE=/scratch/$USER/paddleocr_vl15
@@ -37,12 +40,23 @@ python -m pip install --upgrade pip
 python -m pip install -e $BASE/new-ocr
 ```
 
+### Optional fallback: avoid venv Python mismatch
+
+If you ever hit a Torch node mismatch where the `venv` python no longer runs on compute nodes,
+you can run the orchestration with a portable Conda env python instead:
+
+```bash
+BASE=/scratch/$USER/paddleocr_vl15
+export NEWSBAG_PY="$BASE/envs/mineru25_py310/bin/python"
+$NEWSBAG_PY -m pip install -e $BASE/new-ocr
+```
+
 Model envs are referenced by path in `configs/pipeline.torch.json`. Verify they exist:
 
 ```bash
 BASE=/scratch/$USER/paddleocr_vl15
-$BASE/envs/paddleocr_gpu_py312/bin/paddleocr --help
-$BASE/envs/doclayout_l40s/bin/python -c 'import onnxruntime as ort; print(ort.get_available_providers())'
+$BASE/envs/paddleocr_compute_node/bin/paddleocr --help
+$BASE/envs/mineru25_py310/bin/python -c 'import onnxruntime as ort; print(ort.get_available_providers())'
 $BASE/envs/mineru25_py310/bin/python -c 'import mineru_vl_utils; print(mineru_vl_utils.__version__)'
 ```
 
@@ -93,6 +107,9 @@ Manual submission (explicit run dir + dependency):
 BASE=/scratch/$USER/paddleocr_vl15
 RUN_DIR="$BASE/runs/layout_bagging_$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$RUN_DIR"
+
+# Optional override if your venv python breaks on a compute node:
+# export NEWSBAG_PY="$BASE/envs/mineru25_py310/bin/python"
 
 JID_INFER="$(sbatch --parsable --export=ALL,RUN_DIR="$RUN_DIR" torch/slurm/newsbag_infer_l40s.sbatch)"
 sbatch --dependency=afterok:$JID_INFER --export=ALL,RUN_DIR="$RUN_DIR" torch/slurm/newsbag_fuse_review_cs.sbatch

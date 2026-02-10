@@ -47,4 +47,3 @@ echo "[newsbag] stages=$STAGES"
 nvidia-smi
 
 "$NEWSBAG_PY" -m newsbag run --config "$CONFIG_JSON" --run-dir "$RUN_DIR" --stages "$STAGES"
-

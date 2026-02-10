@@ -4,6 +4,7 @@ __pycache__/
 *.so
 .venv/
 venv/
+.pytest_cache/
 
 # Build
 build/

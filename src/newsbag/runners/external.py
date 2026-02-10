@@ -57,8 +57,6 @@ def run_dell(dcfg: DellConfig, manifest: Path, run_dir: Path, resume: bool = Tru
         raise ValueError("dell.model_path is required when dell.enabled=true")
     if not dcfg.label_map_path:
         raise ValueError("dell.label_map_path is required when dell.enabled=true")
-    if not dcfg.repo_src:
-        raise ValueError("dell.repo_src is required when dell.enabled=true")
 
     out_root = run_dir / "outputs" / "sources" / "dell" / dcfg.variant_id
     out_root.mkdir(parents=True, exist_ok=True)
@@ -73,8 +71,6 @@ def run_dell(dcfg: DellConfig, manifest: Path, run_dir: Path, resume: bool = Tru
         dcfg.model_path,
         "--label_map",
         dcfg.label_map_path,
-        "--repo_src",
-        dcfg.repo_src,
         "--output_root",
         str(out_root),
         "--conf",
@@ -86,6 +82,10 @@ def run_dell(dcfg: DellConfig, manifest: Path, run_dir: Path, resume: bool = Tru
         "--provider",
         dcfg.provider,
     ]
+    # Back-compat: older Dell scripts required --repo_src for helper imports.
+    # Our current runner doesn't need it, but accept/pass-through when configured.
+    if dcfg.repo_src:
+        cmd.extend(["--repo_src", dcfg.repo_src])
     if resume:
         cmd.append("--resume")
     result = run_cmd(cmd, log_file, timeout_sec=12 * 3600)
