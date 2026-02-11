@@ -27,6 +27,11 @@ This repo intentionally separates environments (and keeps them decoupled):
 - Dell env (ONNXRuntime CUDA)
 - MinerU env (Transformers + `mineru_vl_utils`)
 
+Default in shipped Slurm scripts:
+- `VENV_DIR` defaults to `$BASE/envs/mineru25_py310` because Torch commonly has this env available
+  with Python 3.10+ (compatible with `newsbag`).
+- You can override by exporting `VENV_DIR` or `NEWSBAG_PY`.
+
 ### Recommended orchestration env
 
 Use a scratch-backed venv for the orchestration layer (this repo). It stays lightweight and

@@ -29,7 +29,7 @@ if [ -z "${PROJECT_ROOT:-}" ]; then
     PROJECT_ROOT="$BASE/new-ocr"
   fi
 fi
-VENV_DIR="${VENV_DIR:-$BASE/envs/newsbag}"
+VENV_DIR="${VENV_DIR:-$BASE/envs/mineru25_py310}"
 CONFIG_JSON="${CONFIG_JSON:-$PROJECT_ROOT/configs/pipeline.torch.json}"
 RUN_ROOT="${RUN_ROOT:-$BASE/runs}"
 

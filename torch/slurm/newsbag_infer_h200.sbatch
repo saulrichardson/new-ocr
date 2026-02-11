@@ -20,7 +20,7 @@ set -euo pipefail
 
 BASE="${BASE:-/scratch/$USER/paddleocr_vl15}"
 PROJECT_ROOT="${PROJECT_ROOT:-$BASE/new-ocr}"
-VENV_DIR="${VENV_DIR:-$BASE/envs/newsbag}"
+VENV_DIR="${VENV_DIR:-$BASE/envs/mineru25_py310}"
 CONFIG_JSON="${CONFIG_JSON:-$PROJECT_ROOT/configs/pipeline.torch.json}"
 # IMPORTANT: Paddle (layout_detection + VL1.5 doc_parser) does not currently run reliably on Torch H200
 # due to CUDA kernel image mismatch errors. Keep this job H200-safe by defaulting to Dell+MinerU only.
