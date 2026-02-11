@@ -35,7 +35,6 @@ if echo ",$STAGES," | grep -qE ",paddle_layout,|,paddle_vl15,"; then
 fi
 
 if [ -z "$NEWSBAG_PY" ]; then
-  source "$VENV_DIR/bin/activate"
   NEWSBAG_PY="$VENV_DIR/bin/python"
 fi
 

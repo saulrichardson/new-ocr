@@ -33,7 +33,6 @@ fi
 
 cd "$PROJECT_ROOT"
 if [ -z "$NEWSBAG_PY" ]; then
-  source "$VENV_DIR/bin/activate"
   NEWSBAG_PY="$VENV_DIR/bin/python"
 fi
 
