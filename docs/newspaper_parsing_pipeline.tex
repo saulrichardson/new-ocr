@@ -8,6 +8,15 @@
 \usepackage{xcolor}
 \usepackage{listings}
 \usepackage{fancyvrb}
+\usepackage{iftex}
+\ifXeTeX
+  \usepackage{fontspec}
+  \usepackage{xeCJK}
+  \setmainfont{Times New Roman}
+  \setmonofont{Menlo}
+  \setCJKmainfont{Songti SC}
+  \setCJKmonofont{Songti SC}
+\fi
 
 \hypersetup{
   colorlinks=true,
