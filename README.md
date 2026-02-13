@@ -64,6 +64,7 @@ flowchart LR
 - `configs/pipeline.torch.json` Torch reference config
 - `torch/slurm/` sbatch templates + submit helpers
 - `scripts/make_manifest.py` manifest generation utility
+- `scripts/stage_inputs.py` mixed-input staging utility (file/dir/manifest/archive -> manifest)
 - `scripts/monitor_torch_jobs.sh` queue monitor helper
 - `docs/output_layout.md` exact artifact contracts
 - `docs/torch_hpc.md` Torch operational guidance
@@ -88,13 +89,18 @@ newsbag run --config configs/pipeline.local.json \
   --stages paddle_layout,paddle_vl15,dell,mineru,fusion,review,transcription
 ```
 
-Create a manifest from a scan folder:
+Stage mixed inputs into a manifest:
 
 ```bash
-python scripts/make_manifest.py \
-  --input /absolute/path/to/scans \
+python scripts/stage_inputs.py \
+  --input /absolute/path/to/one_page.png \
+  --input /absolute/path/to/page_batch.tar.gz \
+  --input /absolute/path/to/more_pages_dir \
+  --staging-dir /absolute/path/to/staging \
   --output /absolute/path/to/news_manifest.txt
 ```
+
+Staging automatically ignores common archive metadata junk (`__MACOSX/`, `.DS_Store`, `._*`) so those files do not leak into Slurm manifests.
 
 ## Quick start (Torch, recommended)
 
@@ -105,13 +111,46 @@ cd /scratch/$USER/paddleocr_vl15/newspaper-parsing
 bash torch/slurm/preflight_gpu.sh
 ```
 
-### 1) Submit end-to-end from a folder
+### 1) Submit end-to-end from mixed inputs
+
+Single page:
+
+```bash
+cd /scratch/$USER/paddleocr_vl15/newspaper-parsing
+bash torch/slurm/submit_newsbag.sh \
+  --input /scratch/$USER/paddleocr_vl15/input/newspapers/page_0001.png \
+  --gpu split
+```
+
+Directory (recursive):
 
 ```bash
 cd /scratch/$USER/paddleocr_vl15/newspaper-parsing
 
-bash torch/slurm/submit_newsbag_from_dir.sh \
-  --input-dir /scratch/$USER/paddleocr_vl15/input/your_pages \
+bash torch/slurm/submit_newsbag.sh \
+  --input /scratch/$USER/paddleocr_vl15/input/your_pages \
+  --recursive \
+  --gpu split
+```
+
+Tar archive:
+
+```bash
+cd /scratch/$USER/paddleocr_vl15/newspaper-parsing
+bash torch/slurm/submit_newsbag.sh \
+  --input /scratch/$USER/paddleocr_vl15/input/stress_pages_20260213.tar.gz \
+  --gpu split
+```
+
+Mixed (single file + dir + archive + manifest list):
+
+```bash
+cd /scratch/$USER/paddleocr_vl15/newspaper-parsing
+bash torch/slurm/submit_newsbag.sh \
+  --input /scratch/$USER/paddleocr_vl15/input/smoke/page_a.png \
+  --input /scratch/$USER/paddleocr_vl15/input/stress_dir \
+  --input /scratch/$USER/paddleocr_vl15/input/newspapers_batch.tgz \
+  --input /scratch/$USER/paddleocr_vl15/input/list_of_pages.txt \
   --recursive \
   --gpu split
 ```
@@ -189,8 +228,8 @@ Submission command used:
 
 ```bash
 cd /scratch/$USER/paddleocr_vl15/newspaper-parsing
-bash torch/slurm/submit_newsbag_from_dir.sh \
-  --input-dir /scratch/$USER/paddleocr_vl15/input/newspaper_parsing_example_20260213 \
+bash torch/slurm/submit_newsbag.sh \
+  --input /scratch/$USER/paddleocr_vl15/input/newspaper_parsing_example_20260213 \
   --gpu l40s
 ```
 

@@ -1,17 +1,23 @@
 #!/bin/bash
-# Submit a directory of newspaper scans through the full pipeline on Torch.
+# Submit newspaper inputs through the full pipeline on Torch.
 #
 # This script:
 # 1) Creates a run directory (RUN_DIR) under /scratch/$USER/paddleocr_vl15/runs
-# 2) Generates a manifest from INPUT_DIR
+# 2) Stages mixed input types and generates an image manifest
 # 3) Writes a per-run config.json (based on configs/pipeline.torch.json)
 # 4) Submits GPU inference + CPU fusion/review + GPU transcription (afterok chain)
 #
 # Usage (on Torch login):
-#   bash torch/slurm/submit_newsbag_from_dir.sh --input-dir /path/to/scans --recursive --gpu l40s
+#   bash torch/slurm/submit_newsbag_from_dir.sh --input /path/to/scans --recursive --gpu l40s
 #
 # Flags:
-#   --input-dir <dir>   Required. Directory containing PNG/JPG/TIFF/etc.
+#   --input <path>      Required; repeatable. Each may be:
+#                      - a single image file
+#                      - a directory of images
+#                      - a manifest text file (.txt/.manifest/.lst/.tsv/.csv)
+#                      - an archive (.tar/.tar.gz/.tgz/.zip)
+#                      (also supports comma-separated paths)
+#   --input-dir <dir>   Deprecated alias for --input.
 #   --recursive         Optional. Recurse subdirectories.
 #   --gpu l40s|h200|split  Optional. Default: l40s.
 #   --max-pages N       Optional. Limit the manifest to N images (for smoke tests).
@@ -23,7 +29,7 @@
 
 set -euo pipefail
 
-INPUT_DIR=""
+INPUTS=()
 RECURSIVE=0
 GPU_KIND="l40s"
 RUN_DIR=""
@@ -32,8 +38,12 @@ STAGES=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --input)
+      INPUTS+=("${2:-}")
+      shift 2
+      ;;
     --input-dir)
-      INPUT_DIR="${2:-}"
+      INPUTS+=("${2:-}")
       shift 2
       ;;
     --recursive)
@@ -67,8 +77,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$INPUT_DIR" ]]; then
-  echo "ERROR: --input-dir is required" >&2
+if [[ "${#INPUTS[@]}" -eq 0 ]]; then
+  echo "ERROR: at least one --input path is required" >&2
   exit 2
 fi
 
@@ -85,34 +95,36 @@ mkdir -p "$RUN_DIR/manifests"
 
 MANIFEST="$RUN_DIR/manifests/images.input.txt"
 OUT_CONFIG="$RUN_DIR/manifests/config.input.json"
+STAGING_DIR="$RUN_DIR/staged_inputs"
 
-echo "[submit] input_dir=$INPUT_DIR"
+echo "[submit] input_count=${#INPUTS[@]}"
+for i in "${!INPUTS[@]}"; do
+  echo "[submit] input[$((i+1))]=${INPUTS[$i]}"
+done
 echo "[submit] recursive=$RECURSIVE"
 echo "[submit] gpu_kind=$GPU_KIND"
 echo "[submit] max_pages=$MAX_PAGES"
 echo "[submit] run_dir=$RUN_DIR"
+echo "[submit] staging_dir=$STAGING_DIR"
 if [[ -n "$STAGES" ]]; then
   echo "[submit] stages=$STAGES"
 fi
 
-MAKE_MANIFEST_ARGS=(--input "$INPUT_DIR" --output "$MANIFEST")
+STAGE_INPUT_ARGS=(--output "$MANIFEST" --staging-dir "$STAGING_DIR" --max-pages "$MAX_PAGES")
 if [[ "$RECURSIVE" -eq 1 ]]; then
-  MAKE_MANIFEST_ARGS+=(--recursive)
+  STAGE_INPUT_ARGS+=(--recursive)
 fi
+for in_path in "${INPUTS[@]}"; do
+  STAGE_INPUT_ARGS+=(--input "$in_path")
+done
 
-# scripts/make_manifest.py is stdlib-only; use python3 from login node.
-python3 "$PROJECT_ROOT/scripts/make_manifest.py" "${MAKE_MANIFEST_ARGS[@]}"
-
-if [[ "$MAX_PAGES" -gt 0 ]]; then
-  tmp="$MANIFEST.tmp"
-  head -n "$MAX_PAGES" "$MANIFEST" > "$tmp"
-  mv "$tmp" "$MANIFEST"
-fi
+# scripts/stage_inputs.py is stdlib-only; use python3 from login node.
+python3 "$PROJECT_ROOT/scripts/stage_inputs.py" "${STAGE_INPUT_ARGS[@]}"
 
 COUNT="$(wc -l < "$MANIFEST" | tr -d ' ')"
 echo "[submit] manifest_count=$COUNT"
 if [[ "$COUNT" -eq 0 ]]; then
-  echo "ERROR: manifest is empty (no images found)" >&2
+  echo "ERROR: manifest is empty after staging (no images found)" >&2
   exit 2
 fi
 

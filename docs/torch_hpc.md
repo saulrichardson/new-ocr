@@ -124,8 +124,8 @@ End-to-end helper when you have a directory of scans:
 
 ```bash
 cd /scratch/$USER/paddleocr_vl15/newspaper-parsing
-bash torch/slurm/submit_newsbag_from_dir.sh \
-  --input-dir /scratch/$USER/paddleocr_vl15/input/ad_hoc_newspapers_20260205_190618 \
+bash torch/slurm/submit_newsbag.sh \
+  --input /scratch/$USER/paddleocr_vl15/input/ad_hoc_newspapers_20260205_190618 \
   --recursive \
   --gpu l40s
 ```
@@ -134,11 +134,31 @@ Split GPU helper:
 
 ```bash
 cd /scratch/$USER/paddleocr_vl15/newspaper-parsing
-bash torch/slurm/submit_newsbag_from_dir.sh \
-  --input-dir /scratch/$USER/paddleocr_vl15/input/stress_iter10_pages \
+bash torch/slurm/submit_newsbag.sh \
+  --input /scratch/$USER/paddleocr_vl15/input/stress_iter10_pages \
   --recursive \
   --gpu split
 ```
+
+Single-page helper:
+
+```bash
+cd /scratch/$USER/paddleocr_vl15/newspaper-parsing
+bash torch/slurm/submit_newsbag.sh \
+  --input /scratch/$USER/paddleocr_vl15/input/single_page/page_0001.png \
+  --gpu split
+```
+
+Archive helper (tar/zip staging is automatic):
+
+```bash
+cd /scratch/$USER/paddleocr_vl15/newspaper-parsing
+bash torch/slurm/submit_newsbag.sh \
+  --input /scratch/$USER/paddleocr_vl15/input/stress_batch_20260213.tar.gz \
+  --gpu split
+```
+
+Archive staging ignores common metadata entries (`__MACOSX/`, `.DS_Store`, `._*`) so only real image pages are scheduled.
 
 Manual submission (explicit run dir + dependency):
 
